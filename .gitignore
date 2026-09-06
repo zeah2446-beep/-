@@ -1,0 +1,22 @@
+# dependencies
+node_modules/
+
+# أسرار / كلمة المرور الإدارية (لا تُرفع أبدًا)
+config.json
+.env
+.env.local
+
+# بيانات حية ووسائط مرفوعة (لا تُرفع إلى مستودع عام)
+data/*.json
+data/*.json.tmp-*
+uploads/
+!uploads/.gitkeep
+
+# مؤقتات
+*.log
+*.tmp
+.DS_Store
+npm-debug.log*
+
+# لا نرفع أبدًا بيانات العملاء أو النسخ الاحتياطية
+backups/
