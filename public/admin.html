@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>إدارة بيتك عندنا</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/global.css">
+  <meta name="robots" content="noindex, nofollow">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <span class="brand-name"><span class="brand">إدارة بيتك عندنا</span></span>
+      <span class="topbar-spacer"></span>
+      <nav class="nav-inline">
+        <a href="/" class="ghost">عرض الموقع</a>
+        <button id="logout-btn" class="btn btn-ghost-danger" style="display:none" type="button">تسجيل الخروج</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- شاشة تسجيل الدخول (تُعرض إن مفيش جلسة صحيحة حتى بالرابط المباشر) -->
+    <div id="login-screen">
+      <div class="detail-card" style="max-width:420px;margin:0 auto">
+        <h2 style="text-align:center;color:var(--teal-dark);margin-top:0">دخول الإدارة</h2>
+        <div id="login-msg" class="msg"></div>
+        <form id="login-form">
+          <div class="field">
+            <label for="admin-pass">كلمة المرور</label>
+            <input type="password" id="admin-pass" autocomplete="off" placeholder="كلمة المرور">
+          </div>
+          <button class="btn btn-block" id="login-btn" type="submit">دخول</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- لوحة الإدارة -->
+    <div id="admin-panel" style="display:none">
+      <h1 class="section-title">لوحة الإدارة</h1>
+      <div class="small muted" id="admin-stats"></div>
+
+      <div class="tabs">
+        <button type="button" data-tab="add" class="active">إضافة منشور</button>
+        <button type="button" data-tab="requests">طلبات الشقق</button>
+      </div>
+
+      <!-- تبويب: إضافة منشور -->
+      <section id="tab-add" class="panel active">
+        <div class="detail-card">
+          <div id="pub-msg" class="msg"></div>
+          <form id="post-form">
+            <div class="field">
+              <label for="ptitle">عنوان المنشور <span class="req">*</span></label>
+              <input id="ptitle" type="text" maxlength="90" placeholder="مثال: شقة إيجار في مدينة نصر">
+              <div class="hint">من 3 لـ 90 حرف.</div>
+            </div>
+            <div class="field">
+              <label for="plocation">مكان الشقة <span class="req">*</span></label>
+              <input id="plocation" type="text" maxlength="150" placeholder="المكان/الحي">
+              <div class="hint">من 2 لـ 150 حرف.</div>
+            </div>
+            <div class="field">
+              <label for="pdescription">وصف الشقة <span class="req">*</span></label>
+              <textarea id="pdescription" maxlength="4000" rows="6" placeholder="اكتب الوصف الكامل: المساحة، عدد الغرف، التشطيب، القريب منها، إلخ"></textarea>
+              <div class="hint">من 10 لـ 4000 حرف.</div>
+            </div>
+            <div class="field">
+              <label>الصور <span class="small muted">(اختياري — حتى 8، كل صورة حتى 5MB)</span></label>
+              <div class="file-picker" id="img-picker">
+                <div>🖼️ اضغط لاختيار صور (JPG / PNG / WebP)</div>
+                <input type="file" id="pimages" accept="image/jpeg,image/png,image/webp" multiple>
+              </div>
+              <div class="media-previews" id="img-previews"></div>
+            </div>
+            <div class="field">
+              <label>الفيديو <span class="small muted">(اختياري — فيديو واحد حتى 20MB)</span></label>
+              <div class="file-picker" id="vid-picker">
+                <div>🎬 اضغط لاختيار فيديو (MP4 / WebM)</div>
+                <input type="file" id="pvideo" accept="video/mp4,video/webm">
+              </div>
+              <div class="media-previews" id="vid-previews"></div>
+            </div>
+            <button class="btn btn-block btn-lg" id="post-btn" type="submit">نشر المنشور 🚀</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- تبويب: طلبات الشقق -->
+      <section id="tab-requests" class="panel">
+        <div class="filter-bar">
+          <select id="status-filter">
+            <option value="الكل">كل الطلبات</option>
+            <option value="جديد">جديد</option>
+            <option value="قيد المراجعة">قيد المراجعة</option>
+            <option value="متوفر">متوفر</option>
+            <option value="غير متوفر">غير متوفر</option>
+          </select>
+          <span class="small muted" id="req-total"></span>
+          <span style="flex:1"></span>
+          <button class="btn btn-outline btn-sm" id="refresh-btn" type="button">↻ تحديث</button>
+        </div>
+        <div id="req-msg" class="msg"></div>
+        <div id="req-list"></div>
+        <div class="pager" id="pager"></div>
+      </section>
+    </div>
+  </main>
+
+  <script src="/js/admin.js"></script>
+</body>
+</html>

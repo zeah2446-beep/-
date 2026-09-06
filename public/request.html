@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>اطلب شقة — بيتك عندنا</title>
+  <meta name="description" content="مش لاقي الشقة المناسبة؟ اكتب مواصفاتها وإحنا هنراجع طلبك ونتواصل معاك.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/global.css">
+  <link rel="icon" href="/assets/brand.jpg" type="image/jpeg">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand-lockup" href="/">
+        <img class="logo" src="/assets/brand.jpg" alt="شعار بيتك عندنا"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';">
+        <span style="display:none;align-items:center;justify-content:center;background:var(--teal);color:#fff;font-weight:900;width:42px;height:42px;border-radius:50%;flex:0 0 auto;">ب</span>
+        <span class="brand-name"><span class="brand">بيتك عندنا</span><br><span class="brand-tag">بيتك الجاي… بدايته هنا</span></span>
+      </a>
+      <span class="topbar-spacer"></span>
+      <nav class="nav-inline">
+        <a href="/index.html" class="ghost">الرئيسية</a>
+        <a href="/listings.html" class="ghost">المنشورات</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <h1 class="section-title">اطلب شقة</h1>
+    <p class="muted">مش لاقي الشقة اللي في بالك بين المنشورات؟ ابعتلنا مواصفاتها واحنا هنراجع طلبك ونتواصل معاك.</p>
+
+    <div id="form-wrap">
+      <div class="detail-card">
+        <div id="msg" class="msg" role="alert"></div>
+        <form id="req-form" novalidate>
+          <div class="field">
+            <label for="name">اسم العميل <span class="req">*</span></label>
+            <input id="name" name="name" type="text" maxlength="80" autocomplete="name" placeholder="اكتب اسمك">
+            <div class="hint">من 2 لـ 80 حرف.</div>
+          </div>
+          <div class="field">
+            <label for="phone">رقم التواصل <span class="req">*</span></label>
+            <input id="phone" name="phone" type="tel" dir="rtl" maxlength="20" autocomplete="tel" placeholder="01xxxxxxxxx (موبايل مصري أو رقم دولي)">
+            <div class="hint">هنستخدمه للتواصل معاك أو واتساب بخصوص طلبك بس.</div>
+          </div>
+          <div class="field">
+            <label for="area">المنطقة أو الحي المطلوب <span class="req">*</span></label>
+            <input id="area" name="area" type="text" maxlength="150" placeholder="مثال: مدينة نصر، أو المعادي">
+            <div class="hint">من 2 لـ 150 حرف.</div>
+          </div>
+          <div class="field">
+            <label for="budget">الميزانية التقريبية <span class="req">*</span></label>
+            <input id="budget" name="budget" type="text" maxlength="100" placeholder="مثال: إيجار شهري 5000 جنيه — أو للشراء لحد مليون جنيه">
+            <div class="hint">اكتب العملة وإذا كان للإيجار الشهري أم للشراء.</div>
+          </div>
+          <div class="field">
+            <label for="description">وصف الشقة والمواصفات المطلوبة <span class="req">*</span></label>
+            <textarea id="description" name="description" maxlength="3000" rows="7" placeholder="اكتب المساحة المطلوبة، عدد الغرف، نوع الطلب (إيجار/شراء/إلخ)، وأي مواصفات مهمة"></textarea>
+            <div class="hint">من 10 لـ 3000 حرف.</div>
+          </div>
+
+          <div class="ask-bar" style="margin:0 0 16px;align-items:flex-start">
+            <div style="font-size:.9rem">
+              <p class="ab-s" style="margin:0">🔒 بيانات الطلب دي خاصة بإدارة الموقع ومش بتتنشر للعامة. إرسال الطلب بيسمح لنا نتواصل معاك بخصوصه بالهاتف أو واتساب.<br>
+              ⚠️ إرسال الطلب مش تأكيد إن في شقة متاحة — التوفر بيتراجع يدويًا واحنا هنرد عليك.</p>
+            </div>
+          </div>
+
+          <button class="btn btn-block btn-lg" id="send-btn" type="submit">أرسل الطلب 📨</button>
+        </form>
+      </div>
+    </div>
+
+    <div id="success-wrap" style="display:none">
+      <div class="detail-card center">
+        <div style="font-size:3rem">✅</div>
+        <h2>تم استلام طلبك</h2>
+        <p class="muted">احتفظ بالرقم المرجعي ده عشان تستعلم بيه عن طلبك لما نتواصل معاك.</p>
+        <div class="refbox"><div>الرقم المرجعي</div><div class="ref" id="ref-num">—</div></div>
+        <div class="mt3" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+          <a href="/listings.html" class="btn">تصفح الشقق</a>
+          <a href="/" class="btn-cream btn">الرئيسية</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>© <span class="ltr">2026</span> بيتك عندنا</footer>
+  <script src="/js/common.js"></script>
+  <script src="/js/request.js"></script>
+</body>
+</html>
