@@ -590,7 +590,7 @@ function handleCreatePost(req, res) {
   });
 }
 
-app.get('/api/health', (req, res) => res.json({ ok: true, service: 'بيتك عندنا', up: true }));
+app.get('/api/health', (req, res) => res.json({ ok: true, service: 'بيتك عندنا', up: true, hosting: IS_SERVERLESS ? 'vercel' : 'server' }));
 app.get('/', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
 app.get('/listings', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'listings.html')));
 app.get('/detail', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'detail.html')));
@@ -603,6 +603,19 @@ app.use((req, res) => {
     return res.status(404).sendFile(path.join(PUBLIC_DIR, '404.html'));
   }
   res.status(404).json({ ok: false, error: 'غير موجود.' });
+});
+
+// مصدّق أخطاء موحّد (JSON دايمًا) — عشان الواجهة تعرف توضح السبب بدل «تعذّر الاتصال»
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  if (err && (err.type === 'entity.too.large' || err.status === 413)) {
+    return res.status(413).json({ ok: false, error: 'الطلب أكبر من الحد المسموح. قلل حجم الصور أو عددها وحاول تاني.' });
+  }
+  if (err && err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({ ok: false, error: 'أحد الملفات أكبر من الحد المسموح (صورة 5MB / فيديو 20MB).' });
+  }
+  console.error(err);
+  res.status(500).json({ ok: false, error: 'خطأ غير متوقع في الخادم. حاول تاني.' });
 });
 
 loadData();

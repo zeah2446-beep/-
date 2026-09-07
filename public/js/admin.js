@@ -117,7 +117,173 @@
   let selectedImages = [];
   let selectedVideo = null;
 
-  $('img-picker').addEventListener('click', function () { $('pimages').click(); });
+  // حدود الرفع حسب نوع الاستضافة: Vercel المجاني بيقطع الطلبات فوق ~4.5MB على حافته
+  const HOSTING_LIMITS = { vercel: 4 * 1024 * 1024, server: 40 * 1024 * 1024 };
+  let hostingName = 'server';
+  let hostingLimit = HOSTING_LIMITS.server;
+
+  // الخادم بيقلنا مين اللي بيستضيف (vercel / server) — عشان نطبق الحد الصح
+  fetch('/api/health').then(function (r) { return r.json(); }).then(function (d) {
+    if (d && d.ok && d.hosting && HOSTING_LIMITS[d.hosting]) {
+      hostingName = d.hosting;
+      hostingLimit = HOSTING_LIMITS[d.hosting];
+    }
+  }).catch(function () { /* نفضل على الحد الافتراضي */ });
+
+  function totalMediaBytes() {
+    const imgBytes = selectedImages.reduce(function (s, f) { return s + (f.size || 0); }, 0);
+    return imgBytes + (selectedVideo ? (selectedVideo.size || 0) : 0);
+  }
+
+  function fmtMb(bytes) {
+    return (bytes / (1024 * 1024)).toFixed(1);
+  }
+
+  // ضغط صورة في المتصفح (Canvas) قبل الرفع: حد أقصى 1600px بجودة 75%
+  // الصور الصغيرة (<350KB) أو اللي مش صور: بتعدي زي ما هي
+  function compressImage(file, maxEdge, quality) {
+    return new Promise(function (resolve) {
+      if (!file || !file.type || file.type.indexOf('image/') !== 0) { resolve(file); return; }
+      if (file.size <= 350 * 1024) { resolve(file); return; }
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = function () {
+        try {
+          const w = img.naturalWidth || img.width;
+          const h = img.naturalHeight || img.height;
+          if (!w || !h) { URL.revokeObjectURL(url); resolve(file); return; }
+          const scale = Math.min(1, maxEdge / Math.max(w, h));
+          const cw = Math.max(1, Math.round(w * scale));
+          const ch = Math.max(1, Math.round(h * scale));
+          const canvas = document.createElement('canvas');
+          canvas.width = cw;
+          canvas.height = ch;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, cw, ch);
+          URL.revokeObjectURL(url);
+          canvas.toBlob(function (blob) {
+            if (blob && blob.size < file.size) {
+              const name = (file.name || 'image').replace(/\.[^.]+$/, '') + '.jpg';
+              resolve(new File([blob], name, { type: 'image/jpeg' }));
+            } else {
+              resolve(file);
+            }
+          }, 'image/jpeg', quality);
+        } catch (e) {
+          URL.revokeObjectURL(url);
+          resolve(file);
+        }
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    });
+  }
+
+  // قراءة استجابة آمنة: لو الخادم/الاستضافة ردوا صفحة HTML (زي 413 من Vercel)
+  // بنحوّلها لرسالة واضحة بدل ما الـ fetch «يقع» في catch
+  function parseApiText(r) {
+    return r.text().then(function (t) {
+      let d = null;
+      try { d = JSON.parse(t); } catch (e) { d = null; }
+      if (r.status === 413) {
+        return { status: 413, d: { ok: false, error: 'الطلب أكبر من الحد المسموح على الاستضافة (Vercel المجاني ≈4.5MB). قلل عدد الصور أو حجمها — لو حاط فيديو، شيله وحاول تاني.' } };
+      }
+      if (!d || typeof d !== 'object') {
+        return { status: r.status, d: { ok: false, error: 'استجابة غير متوقعة من الخادم (رمز ' + r.status + '). حاول تاني.' } };
+      }
+      return { status: r.status, d: d };
+    });
+  }
+
+  // رفع المنشور بعد تجهيز الصور
+  function doPublish() {
+    const btn = $('post-btn');
+    btn.innerHTML = '<span class="spinner"></span> جارٍ النشر…';
+
+    const fd = new FormData();
+    fd.append('title', $('ptitle').value.trim());
+    fd.append('location', $('plocation').value.trim());
+    fd.append('description', $('pdescription').value.trim());
+    fd.append('type', $('ptype') ? $('ptype').value : '');
+    fd.append('price', $('pprice') ? $('pprice').value.trim() : '');
+    fd.append('rooms', $('prooms') ? $('prooms').value.trim() : '');
+    fd.append('areaM2', $('parea') ? $('parea').value.trim() : '');
+    selectedImages.forEach(function (f) { fd.append('images', f, f.name); });
+    if (selectedVideo) fd.append('video', selectedVideo, selectedVideo.name);
+
+    fetch('/api/admin/posts', { method: 'POST', headers: apiHeaders(false), body: fd })
+      .then(parseApiText)
+      .then(function (res) {
+        if (res.d && res.d.ok) {
+          // نجاح فعلي بعد الحفظ على الخادم
+          $('ptitle').value = ''; $('plocation').value = ''; $('pdescription').value = '';
+          if ($('pprice')) $('pprice').value = '';
+          if ($('prooms')) $('prooms').value = '';
+          if ($('parea')) $('parea').value = '';
+          selectedImages = []; selectedVideo = null;
+          renderImgPreviews(); renderVidPreviews();
+          showMsg($('pub-msg'), 'تم نشر المنشور بنجاح. هيظهر للزوار في كل المتصفحات.', 'ok');
+          loadStats();
+        } else if (res.status === 401 || res.status === 403) {
+          showMsg($('pub-msg'), (res.d && res.d.error) || 'انتهت الجلسة. سجّل الدخول من جديد.', 'err');
+          sessionStorage.removeItem('bc_csrf');
+          setTimeout(function () { location.reload(); }, 900);
+        } else {
+          showMsg($('pub-msg'), (res.d && res.d.error) || 'لم يتم نشر المنشور. حاول تاني.', 'err');
+        }
+      })
+      .catch(function () { showMsg($('pub-msg'), 'تعذّر الوصول للخادم خالص (شبكة/انقطاع). اتأكد من الاتصال وحاول تاني.', 'err'); })
+      .finally(function () {
+        if (btn.disabled) { btn.disabled = false; btn.innerHTML = 'نشر المنشور 🚀'; }
+      });
+  }
+
+  // نشر المنشور: أولًا بنضغط الصور في المتصفح، وبعدها بنفحص الحجم، وبعدين نرفع
+  $('post-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    const btn = $('post-btn');
+    if (btn.disabled) return;
+    const title = $('ptitle').value.trim();
+    const location = $('plocation').value.trim();
+    const description = $('pdescription').value.trim();
+    if (title.length < 3) return pubFail('العنوان مطلوب (3 أحرف على الأقل).');
+    if (location.length < 2) return pubFail('المكان مطلوب.');
+    if (description.length < 10) return pubFail('الوصف مطلوب (10 أحرف على الأقل).');
+
+    btn.disabled = true;
+    clearMsg($('pub-msg'));
+
+    if (!selectedImages.length) {
+      // منشور نصي — مفيش حاجة تضغط
+      doPublish();
+      return;
+    }
+
+    btn.innerHTML = '<span class="spinner"></span> جارٍ ضغط الصور (ده بيسرّع الرفع)…';
+    const chain = selectedImages.reduce(function (p, f) {
+      return p.then(function (acc) {
+        return compressImage(f, 1600, 0.75).then(function (c) { acc.push(c); return acc; });
+      }, []);
+    }, Promise.resolve([]));
+
+    chain.then(function (compressed) {
+      selectedImages = compressed;
+      renderImgPreviews();
+      const total = totalMediaBytes();
+      if (total > hostingLimit) {
+        const mb = fmtMb(total);
+        const limitMb = fmtMb(hostingLimit);
+        if (hostingName === 'vercel') {
+          return pubFail('إجمالي الصور/الفيديو ' + mb + 'MB — أكبر من حد رفع Vercel المجاني (' + limitMb + 'MB). قلل عدد الصور أو حجمها (الضغط التلقائي شغال بس مفيش حد للكم). لو الفيديو هو الكبير، شيله وحاول تاني. على استضافة Node عادية (VPS) الحد 40MB.');
+        }
+        return pubFail('إجمالي الوسائط ' + mb + 'MB يتجاوز 40 ميجابايت.');
+      }
+      doPublish();
+    }).catch(function () {
+      // لو الضغط فشل لسبب غير متوقع، نرفع الأصلية ونسيب الخادم يوضح الخطأ
+      doPublish();
+    });
+  });
   $('pimages').addEventListener('change', function () {
     const files = Array.prototype.slice.call(this.files || []).slice(0, 8 - selectedImages.length);
     files.forEach(function (f) { if (f.size > 5 * 1024 * 1024) { showMsg($('pub-msg'), 'صورة أكبر من 5 ميجابايت.', 'err'); return; } selectedImages.push(f); });
@@ -158,62 +324,6 @@
     d.querySelector('[data-rm]').addEventListener('click', function () { selectedVideo = null; renderVidPreviews(); });
     box.appendChild(d);
   }
-
-  // نشر المنشور
-  $('post-form').addEventListener('submit', function (e) {
-    e.preventDefault();
-    const btn = $('post-btn');
-    if (btn.disabled) return;
-    const title = $('ptitle').value.trim();
-    const location = $('plocation').value.trim();
-    const description = $('pdescription').value.trim();
-    if (title.length < 3) return pubFail('العنوان مطلوب (3 أحرف على الأقل).');
-    if (location.length < 2) return pubFail('المكان مطلوب.');
-    if (description.length < 10) return pubFail('الوصف مطلوب (10 أحرف على الأقل).');
-    const totalSize = selectedImages.reduce(function (s, f) { return s + f.size; }, 0) + (selectedVideo ? selectedVideo.size : 0);
-    if (totalSize > 40 * 1024 * 1024) return pubFail('إجمالي الوسائط يتجاوز 40 ميجابايت.');
-
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> جارٍ النشر…';
-    clearMsg($('pub-msg'));
-
-    const fd = new FormData();
-    fd.append('title', title);
-    fd.append('location', location);
-    fd.append('description', description);
-    fd.append('type', $('ptype') ? $('ptype').value : '');
-    fd.append('price', $('pprice') ? $('pprice').value.trim() : '');
-    fd.append('rooms', $('prooms') ? $('prooms').value.trim() : '');
-    fd.append('areaM2', $('parea') ? $('parea').value.trim() : '');
-    selectedImages.forEach(function (f) { fd.append('images', f, f.name); });
-    if (selectedVideo) fd.append('video', selectedVideo, selectedVideo.name);
-
-    fetch('/api/admin/posts', { method: 'POST', headers: apiHeaders(false), body: fd })
-      .then(function (r) { return r.json().then(function (d) { return { status: r.status, d: d }; }); })
-      .then(function (res) {
-        if (res.d && res.d.ok) {
-          // نجاح فعلي بعد الحفظ على الخادم
-          $('ptitle').value = ''; $('plocation').value = ''; $('pdescription').value = '';
-          if ($('pprice')) $('pprice').value = '';
-          if ($('prooms')) $('prooms').value = '';
-          if ($('parea')) $('parea').value = '';
-          selectedImages = []; selectedVideo = null;
-          renderImgPreviews(); renderVidPreviews();
-          showMsg($('pub-msg'), 'تم نشر المنشور بنجاح. هيظهر للزوار في كل المتصفحات.', 'ok');
-          loadStats();
-        } else if (res.status === 401 || res.status === 403) {
-          showMsg($('pub-msg'), (res.d && res.d.error) || 'انتهت الجلسة. سجّل الدخول من جديد.', 'err');
-          sessionStorage.removeItem('bc_csrf');
-          setTimeout(function () { location.reload(); }, 900);
-        } else {
-          showMsg($('pub-msg'), (res.d && res.d.error) || 'لم يتم نشر المنشور. حاول تاني.', 'err');
-        }
-      })
-      .catch(function () { showMsg($('pub-msg'), 'تعذّر الاتصال بالخادم أثناء الرفع. لم يتم نشر المنشور — راجع وحاول تاني.', 'err'); })
-      .finally(function () {
-        if (btn.disabled) { btn.disabled = false; btn.innerHTML = 'نشر المنشور 🚀'; }
-      });
-  });
 
   function pubFail(text) { showMsg($('pub-msg'), text, 'err'); $('pub-msg').scrollIntoView({ behavior: 'smooth', block: 'center' }); }
 
