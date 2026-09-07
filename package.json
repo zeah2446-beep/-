@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
+    "build": "node scripts/build-vercel.js",
     "setpass": "node scripts/set-password.js"
   },
   "engines": {
