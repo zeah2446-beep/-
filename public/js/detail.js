@@ -97,6 +97,26 @@
     const loc = document.createElement('p');
     loc.className = 'loc-line';
     loc.textContent = '📍 ' + post.location;
+    const facts = document.createElement('div');
+    facts.className = 'facts';
+    [
+      post.type ? ['النوع', post.type] : null,
+      post.price ? ['السعر', post.price] : null,
+      post.rooms ? ['الغرف', post.rooms] : null,
+      post.areaM2 ? ['المساحة', post.areaM2 + ' م²'] : null,
+    ].filter(Boolean).forEach(function (pair) {
+      const item = document.createElement('div');
+      item.className = 'fact';
+      const k = document.createElement('span');
+      k.className = 'fact-k';
+      k.textContent = pair[0];
+      const v = document.createElement('span');
+      v.className = 'fact-v';
+      v.textContent = pair[1];
+      item.appendChild(k);
+      item.appendChild(v);
+      facts.appendChild(item);
+    });
     const lbl = document.createElement('div');
     lbl.className = 'sec-label';
     lbl.textContent = 'الوصف والمكان';
@@ -105,6 +125,7 @@
     desc.textContent = post.description || '';
     card.appendChild(titleH);
     card.appendChild(loc);
+    if (facts.childNodes.length) card.appendChild(facts);
     card.appendChild(lbl);
     card.appendChild(desc);
 

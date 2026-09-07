@@ -7,9 +7,10 @@ config.json
 .env.local
 
 # بيانات حية ووسائط مرفوعة (لا تُرفع إلى مستودع عام)
-data/*.json
+data/*
+!data/.gitkeep
 data/*.json.tmp-*
-uploads/
+uploads/*
 !uploads/.gitkeep
 
 # مؤقتات
