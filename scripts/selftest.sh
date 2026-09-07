@@ -97,7 +97,7 @@ echo "15) إدخال بيانات مخربي لا يُنفَّذ (نص آمن ف
 echo "   (التحقق من عدم التنفيذ يتم في المتصفح عبر textContent) - مذكور في التقارير"
 
 echo "16) تسجيل الخروج"
-lo=$(curl -s -b $J -X POST "$B/api/admin/logout")
+lo=$(curl -s -b $J -c $J -X POST "$B/api/admin/logout")
 ck "خروج ok=true" $([ "$lo" = '{"ok":true}' ] && echo 1 || echo 0)
 sess=$(curl -s -b $J "$B/api/admin/session" | python3 -c "import sys,json;print(json.load(sys.stdin).get('authenticated'))")
 ck "بعد الخروج غير مصادق" $([ "$sess" = "False" ] && echo 1 || echo 0)

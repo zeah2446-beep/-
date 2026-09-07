@@ -1,37 +1,22 @@
 'use strict';
 /**
- * زراعة منشورات تجريبية حقيقية (صور + بيانات) إذا كانت قاعدة المنشورات فارغة.
- * لا يستبدل بيانات موجودة.
+ * زراعة منشورات حقيقية إذا كانت قاعدة المنشورات فارغة.
+ * الصور تُقدَّم من public/listings-media حتى تعمل على Vercel بدون قرص دائم.
  */
 const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
 
-function copyImage(srcPath, uploadsDir) {
-  const buf = fs.readFileSync(srcPath);
-  const name = 'img-' + crypto.randomBytes(8).toString('hex') + '.jpg';
-  fs.writeFileSync(path.join(uploadsDir, name), buf);
-  return '/media/' + name;
+function ts(iso) {
+  return Date.parse(iso);
 }
 
-function daysAgo(n) {
-  return Date.now() - n * 24 * 60 * 60 * 1000;
-}
-
-function seedIfEmpty({ posts, postsFile, uploadsDir, rootDir, enqueueSave }) {
+function seedIfEmpty({ posts, postsFile }) {
   if (Array.isArray(posts) && posts.length > 0) return posts;
-  const srcDir = path.join(rootDir, 'seed-images');
-  if (!fs.existsSync(srcDir)) {
-    console.log('لا توجد صور زراعة في seed-images — الموقع سيبدأ فارغًا.');
-    return posts || [];
-  }
-  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
-  const img = (file) => copyImage(path.join(srcDir, file), uploadsDir);
+  const img = (file) => '/listings-media/' + file;
 
   const seeded = [
     {
-      id: crypto.randomBytes(8).toString('hex'),
+      id: 'post-nasr-rent',
       title: 'شقة إيجار 3 غرف في مدينة نصر',
       location: 'مدينة نصر، القاهرة',
       type: 'إيجار',
@@ -44,11 +29,11 @@ function seedIfEmpty({ posts, postsFile, uploadsDir, rootDir, enqueueSave }) {
         'تشطيب سوبر لوكس، غاز طبيعي، أمن 24 ساعة، قريبة من عباس العقاد والخدمات.\n' +
         'الإيجار شامل الصيانة. معاينة بموعد مسبق.',
       media: { images: [img('nasr-living.jpg'), img('nasr-kitchen.jpg')], videos: [] },
-      createdAt: daysAgo(2),
-      updatedAt: daysAgo(2),
+      createdAt: ts('2026-09-05T10:00:00Z'),
+      updatedAt: ts('2026-09-05T10:00:00Z'),
     },
     {
-      id: crypto.randomBytes(8).toString('hex'),
+      id: 'post-maadi-sale',
       title: 'شقة للبيع في المعادي — إطلالة هادئة',
       location: 'المعادي، القاهرة',
       type: 'بيع',
@@ -61,11 +46,11 @@ function seedIfEmpty({ posts, postsFile, uploadsDir, rootDir, enqueueSave }) {
         'الدور الثالث، تشطيب حديث، قريبة من المترو والنادي.\n' +
         'عقد مسجل، جاهزة للمعاينة والتفاوض الجاد.',
       media: { images: [img('maadi-exterior.jpg'), img('maadi-bedroom.jpg')], videos: [] },
-      createdAt: daysAgo(5),
-      updatedAt: daysAgo(5),
+      createdAt: ts('2026-09-02T10:00:00Z'),
+      updatedAt: ts('2026-09-02T10:00:00Z'),
     },
     {
-      id: crypto.randomBytes(8).toString('hex'),
+      id: 'post-newcairo-rent',
       title: 'شقة حديثة للإيجار في التجمع الخامس',
       location: 'التجمع الخامس، القاهرة الجديدة',
       type: 'إيجار',
@@ -78,11 +63,11 @@ function seedIfEmpty({ posts, postsFile, uploadsDir, rootDir, enqueueSave }) {
         'تشطيب الترا لوكس، تكييفات، جراج، حراسة، جيم ومسبح للكمبوند.\n' +
         'الإيجار غير شامل الكهرباء. عائلات فقط.',
       media: { images: [img('newcairo-living.jpg')], videos: [] },
-      createdAt: daysAgo(1),
-      updatedAt: daysAgo(1),
+      createdAt: ts('2026-09-06T10:00:00Z'),
+      updatedAt: ts('2026-09-06T10:00:00Z'),
     },
     {
-      id: crypto.randomBytes(8).toString('hex'),
+      id: 'post-october-rent',
       title: 'شقة عائلية للإيجار في 6 أكتوبر',
       location: 'الحي المتميز، 6 أكتوبر',
       type: 'إيجار',
@@ -95,11 +80,11 @@ function seedIfEmpty({ posts, postsFile, uploadsDir, rootDir, enqueueSave }) {
         'قريبة من المحور والخدمات والمدارس. تشطيب جيد جدًا.\n' +
         'الإيجار شامل الصيانة. مناسبة للعائلات.',
       media: { images: [img('october-balcony.jpg')], videos: [] },
-      createdAt: daysAgo(8),
-      updatedAt: daysAgo(8),
+      createdAt: ts('2026-08-30T10:00:00Z'),
+      updatedAt: ts('2026-08-30T10:00:00Z'),
     },
     {
-      id: crypto.randomBytes(8).toString('hex'),
+      id: 'post-zamalek-sale',
       title: 'شقة للبيع في الزمالك بإطلالة مميزة',
       location: 'الزمالك، القاهرة',
       type: 'بيع',
@@ -112,11 +97,11 @@ function seedIfEmpty({ posts, postsFile, uploadsDir, rootDir, enqueueSave }) {
         'عمارة راقية بأسانسير، دور مرتفع، موقع حيوي هادئ.\n' +
         'للجادّين في الشراء. المعاينة بتنسيق مسبق.',
       media: { images: [img('zamalek-view.jpg')], videos: [] },
-      createdAt: daysAgo(3),
-      updatedAt: daysAgo(3),
+      createdAt: ts('2026-09-04T10:00:00Z'),
+      updatedAt: ts('2026-09-04T10:00:00Z'),
     },
     {
-      id: crypto.randomBytes(8).toString('hex'),
+      id: 'post-heliopolis-rent',
       title: 'شقة إيجار في مصر الجديدة',
       location: 'مصر الجديدة، القاهرة',
       type: 'إيجار',
@@ -129,11 +114,11 @@ function seedIfEmpty({ posts, postsFile, uploadsDir, rootDir, enqueueSave }) {
         'قريبة من الكوربة والخدمات والمواصلات. تشطيب محترم.\n' +
         'عائلات. الإيجار قابل للنقاش للمدة الطويلة.',
       media: { images: [img('heliopolis-hall.jpg')], videos: [] },
-      createdAt: daysAgo(6),
-      updatedAt: daysAgo(6),
+      createdAt: ts('2026-09-01T10:00:00Z'),
+      updatedAt: ts('2026-09-01T10:00:00Z'),
     },
     {
-      id: crypto.randomBytes(8).toString('hex'),
+      id: 'post-zayed-sale',
       title: 'شقة للبيع في الشيخ زايد',
       location: 'الشيخ زايد، الجيزة',
       type: 'بيع',
@@ -146,11 +131,11 @@ function seedIfEmpty({ posts, postsFile, uploadsDir, rootDir, enqueueSave }) {
         'كمبوند بخدمات كاملة، جراج، أمن. مناسبة للسكن فورًا.\n' +
         'السعر للتفاوض الجاد. الأوراق جاهزة.',
       media: { images: [img('sheikhzayed-living.jpg')], videos: [] },
-      createdAt: daysAgo(4),
-      updatedAt: daysAgo(4),
+      createdAt: ts('2026-09-03T10:00:00Z'),
+      updatedAt: ts('2026-09-03T10:00:00Z'),
     },
     {
-      id: crypto.randomBytes(8).toString('hex'),
+      id: 'post-downtown-studio',
       title: 'استوديو للإيجار في وسط البلد',
       location: 'وسط البلد، القاهرة',
       type: 'إيجار',
@@ -163,15 +148,18 @@ function seedIfEmpty({ posts, postsFile, uploadsDir, rootDir, enqueueSave }) {
         'مناسب لشخص واحد أو زوجين. قريب من المترو والخدمات.\n' +
         'مفروش جزئيًا. الإيجار شامل الإنترنت.',
       media: { images: [img('downtown-studio.jpg')], videos: [] },
-      createdAt: daysAgo(0),
-      updatedAt: daysAgo(0),
+      createdAt: ts('2026-09-07T08:00:00Z'),
+      updatedAt: ts('2026-09-07T08:00:00Z'),
     },
   ];
 
-  const out = seeded;
-  fs.writeFileSync(postsFile, JSON.stringify(out, null, 2), 'utf8');
-  console.log('تمت زراعة ' + out.length + ' منشورات شقق حقيقية مع الصور.');
-  return out;
+  try {
+    fs.writeFileSync(postsFile, JSON.stringify(seeded, null, 2), 'utf8');
+  } catch (e) {
+    /* على الاستضافة بدون قرص دائم نكتفي بالذاكرة */
+  }
+  console.log('تمت زراعة ' + seeded.length + ' منشورات شقق حقيقية مع الصور.');
+  return seeded;
 }
 
 module.exports = { seedIfEmpty };
