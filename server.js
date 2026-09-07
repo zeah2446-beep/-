@@ -15,6 +15,7 @@ const express = require('express');
 const session = require('express-session');
 const multer = require('multer');
 const { verifyPassword, hashPassword } = require('./lib/passwords');
+const { seedIfEmpty } = require('./scripts/seed');
 
 // ------------------------------------------------------------------ paths / config
 const ROOT = __dirname;
@@ -106,6 +107,15 @@ function loadData() {
   requests = readJSON(REQUESTS_FILE, []);
   if (!Array.isArray(posts)) posts = [];
   if (!Array.isArray(requests)) requests = [];
+  if (posts.length === 0) {
+    posts = seedIfEmpty({
+      posts,
+      postsFile: POSTS_FILE,
+      uploadsDir: UPLOADS_DIR,
+      rootDir: ROOT,
+      enqueueSave,
+    }) || [];
+  }
 }
 
 // ------------------------------------------------------------------ sessions / admin state
@@ -276,7 +286,7 @@ app.use(session({
   cookie: {
     httpOnly: true,
     sameSite: 'lax',
-    secure: isHttps ? false : false, // سنجعله يعتمد على الطلب
+    secure: false, // يُفعَّل أدناه إذا كان الطلب عبر HTTPS
     maxAge: 12 * 60 * 60 * 1000,
   }
 }));
@@ -310,12 +320,29 @@ app.get('/api/request-token', (req, res) => {
 });
 
 // ------------------------------------------------ المنشورات (public)
+const ALLOWED_TYPES = ['إيجار', 'بيع', 'أخرى'];
+
 app.get('/api/posts', (req, res) => {
-  const list = posts
-    .slice()
+  const q = cleanText(req.query.q || '', 80).toLowerCase();
+  const type = cleanText(req.query.type || '', 20);
+  let list = posts.slice();
+  if (type && ALLOWED_TYPES.includes(type)) {
+    list = list.filter((p) => p.type === type);
+  }
+  if (q) {
+    list = list.filter((p) => {
+      const hay = [p.title, p.location, p.description, p.price, p.rooms].join(' ').toLowerCase();
+      return hay.indexOf(q) !== -1;
+    });
+  }
+  list = list
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
     .map((p) => ({
       id: p.id, title: p.title, location: p.location, createdAt: p.createdAt,
+      type: p.type || '',
+      price: p.price || '',
+      rooms: p.rooms || '',
+      areaM2: p.areaM2 || '',
       imageCount: (p.media && p.media.images ? p.media.images.length : 0),
       videoCount: (p.media && p.media.videos ? p.media.videos.length : 0),
       hasVideo: !!(p.media && p.media.videos && p.media.videos.length),
@@ -485,11 +512,34 @@ app.post('/api/admin/posts', requireAdmin, requireCsrf, (req, res, next) => {
   });
 });
 
+app.delete('/api/admin/posts/:id', requireAdmin, requireCsrf, (req, res) => {
+  const idx = posts.findIndex((p) => p.id === req.params.id);
+  if (idx < 0) return res.status(404).json({ ok: false, error: 'المنشور غير موجود.' });
+  const [removed] = posts.splice(idx, 1);
+  const mediaFiles = [
+    ...((removed.media && removed.media.images) || []),
+    ...((removed.media && removed.media.videos) || []),
+  ];
+  enqueueSave(POSTS_FILE, posts).then(() => {
+    mediaFiles.forEach((m) => {
+      try { fs.unlinkSync(path.join(UPLOADS_DIR, path.basename(m))); } catch (e) { /* تجاهل */ }
+    });
+    res.json({ ok: true, message: 'تم حذف المنشور.' });
+  }).catch(() => {
+    posts.splice(idx, 0, removed);
+    res.status(500).json({ ok: false, error: 'تعذّر حذف المنشور.' });
+  });
+});
+
 function handleCreatePost(req, res) {
   const b = req.body || {};
   const title = cleanText(b.title, 90);
   const location = cleanText(b.location, 150);
   const description = cleanText(b.description, 4000);
+  const type = cleanText(b.type, 20);
+  const price = cleanText(b.price, 80);
+  const rooms = cleanText(b.rooms, 40);
+  const areaM2 = cleanText(b.areaM2, 20);
 
   const errors = [];
   if (title.length < 3) errors.push('عنوان المنشور مطلوب (3 أحرف على الأقل).');
@@ -498,6 +548,7 @@ function handleCreatePost(req, res) {
   if (location.length > 150) errors.push('المكان أطول من 150 حرفًا.');
   if (description.length < 10) errors.push('الوصف مطلوب (10 أحرف على الأقل).');
   if (description.length > 4000) errors.push('الوصف أطول من 4000 حرف.');
+  if (type && !ALLOWED_TYPES.includes(type)) errors.push('نوع العرض غير صالح (إيجار / بيع / أخرى).');
 
   const files = Array.isArray(req.files) ? req.files : [];
   const images = files.filter((f) => f.fieldname === 'images');
@@ -547,6 +598,10 @@ function handleCreatePost(req, res) {
     title,
     location,
     description,
+    type: type || 'أخرى',
+    price,
+    rooms,
+    areaM2,
     media: saved,
     createdAt: now,
     updatedAt: now,
@@ -577,9 +632,16 @@ app.get('/', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
 app.get('/listings', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'listings.html')));
 app.get('/detail', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'detail.html')));
 app.get('/request', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'request.html')));
+app.get('/admin', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'admin.html')));
 
 // error handling
-app.use((req, res) => res.status(404).json({ ok: false, error: 'غير موجود.' }));
+app.use((req, res) => {
+  const wantsHtml = req.method === 'GET' && !String(req.path || '').startsWith('/api/');
+  if (wantsHtml && fs.existsSync(path.join(PUBLIC_DIR, '404.html'))) {
+    return res.status(404).sendFile(path.join(PUBLIC_DIR, '404.html'));
+  }
+  res.status(404).json({ ok: false, error: 'غير موجود.' });
+});
 
 // boot
 loadData();

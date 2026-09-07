@@ -312,6 +312,45 @@ input, textarea, select { font-family: inherit; font-size: 1rem; }
 .ask-bar .btn:hover { background: var(--green-soft); }
 .ask-bar .ab-cta { margin-right: auto; }
 
+.search-bar {
+  display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 16px;
+}
+.search-bar input, .search-bar select {
+  border: 1.5px solid var(--line); border-radius: 12px; padding: 11px 14px; background: #fff;
+}
+.search-bar input { flex: 1; min-width: 180px; }
+.search-bar select { min-width: 130px; }
+
+.meta-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.price-tag {
+  background: var(--teal); color: #fff; font-weight: 800; font-size: .82rem;
+  padding: 3px 10px; border-radius: 999px;
+}
+.type-chip {
+  background: var(--green-soft); color: var(--teal-dark); font-weight: 800; font-size: .78rem;
+  padding: 3px 10px; border-radius: 999px; border: 1px solid #cfe0d8;
+}
+.meta-item { font-size: .8rem; color: var(--muted); padding: 3px 8px; }
+
+.facts {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px; margin: 4px 0 16px;
+}
+.fact {
+  background: var(--cream); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px;
+}
+.fact-k { display: block; font-size: .75rem; color: var(--muted); font-weight: 700; }
+.fact-v { display: block; font-weight: 800; color: var(--teal-dark); }
+
+.home-latest { margin: 8px 0 22px; }
+.home-latest-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.home-latest-head .ghost { margin-right: auto; font-weight: 800; }
+.home-grid { display: grid; gap: 14px; }
+.admin-thumb {
+  width: 72px; height: 54px; object-fit: cover; border-radius: 8px; background: var(--green-soft); flex: 0 0 auto;
+}
+.admin-thumb.ph { display: flex; align-items: center; justify-content: center; font-size: .7rem; color: var(--muted); }
+
 /* ============ مواضع عامة ============ */
 .mt1 { margin-top: 8px; } .mt2 { margin-top: 16px; } .mt3 { margin-top: 24px; }
 .center { text-align: center; }

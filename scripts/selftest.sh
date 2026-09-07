@@ -14,16 +14,17 @@ for pg in "" "listings.html" "detail.html" "request.html" "admin.html"; do
   ck "GET /$pg -> 200" $([ "$code" = "200" ] && echo 1 || echo 0)
 done
 
-echo "2) حالة فارغة للمنشورات"
-n=$(curl -s "$B/api/posts" | python3 -c "import sys,json;print(json.load(sys.stdin)['count'])")
-ck "عدد المنشورات = 0" $([ "$n" = "0" ] && echo 1 || echo 0)
+echo "2) واجهة برمجة المنشورات تعمل"
+n=$(curl -s "$B/api/posts" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('ok'), d.get('count', -1))")
+ck "GET /api/posts يعيد ok" $(echo "$n" | grep -q "True" && echo 1 || echo 0)
 
 echo "3) كلمة مرور خاطئة مرفوضة (401)"
 code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$B/api/admin/login" -H 'Content-Type: application/json' -d '{"password":"خطأ"}')
 ck "رفض كلمة خاطئة -> 401" $([ "$code" = "401" ] && echo 1 || echo 0)
 
 echo "4) كلمة مرور صحيحة مقبولة"
-resp=$(curl -s -c $J -X POST "$B/api/admin/login" -H 'Content-Type: application/json' -d '{"password":"زياد زياد"}')
+PASS="${ADMIN_PASSWORD:-زياد زياد}"
+resp=$(curl -s -c $J -X POST "$B/api/admin/login" -H 'Content-Type: application/json' -d "{\"password\":\"$PASS\"}")
 csrf=$(echo "$resp" | python3 -c "import sys,json;print(json.load(sys.stdin)['csrf'])")
 ok=$(echo "$resp" | python3 -c "import sys,json;print(json.load(sys.stdin)['ok'])")
 ck "قبول الصحيحة ok=true" $([ "$ok" = "True" ] && echo 1 || echo 0)

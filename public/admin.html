@@ -45,6 +45,7 @@
 
       <div class="tabs">
         <button type="button" data-tab="add" class="active">إضافة منشور</button>
+        <button type="button" data-tab="posts">المنشورات</button>
         <button type="button" data-tab="requests">طلبات الشقق</button>
       </div>
 
@@ -62,6 +63,26 @@
               <label for="plocation">مكان الشقة <span class="req">*</span></label>
               <input id="plocation" type="text" maxlength="150" placeholder="المكان/الحي">
               <div class="hint">من 2 لـ 150 حرف.</div>
+            </div>
+            <div class="field">
+              <label for="ptype">نوع العرض</label>
+              <select id="ptype">
+                <option value="إيجار">إيجار</option>
+                <option value="بيع">بيع</option>
+                <option value="أخرى">أخرى</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="pprice">السعر</label>
+              <input id="pprice" type="text" maxlength="80" placeholder="مثال: 8,500 جنيه / الشهر — أو 3,200,000 جنيه">
+            </div>
+            <div class="field">
+              <label for="prooms">الغرف</label>
+              <input id="prooms" type="text" maxlength="40" placeholder="مثال: 3 غرف + ريسبشن">
+            </div>
+            <div class="field">
+              <label for="parea">المساحة (م²)</label>
+              <input id="parea" type="text" maxlength="20" placeholder="مثال: 145">
             </div>
             <div class="field">
               <label for="pdescription">وصف الشقة <span class="req">*</span></label>

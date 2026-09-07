@@ -108,6 +108,7 @@
       const tab = btn.dataset.tab;
       $('tab-' + tab).classList.add('active');
       if (tab === 'requests') loadRequests(true);
+      if (tab === 'posts') loadAdminPosts();
     });
   });
 
@@ -179,6 +180,10 @@
     fd.append('title', title);
     fd.append('location', location);
     fd.append('description', description);
+    fd.append('type', $('ptype') ? $('ptype').value : '');
+    fd.append('price', $('pprice') ? $('pprice').value.trim() : '');
+    fd.append('rooms', $('prooms') ? $('prooms').value.trim() : '');
+    fd.append('areaM2', $('parea') ? $('parea').value.trim() : '');
     selectedImages.forEach(function (f) { fd.append('images', f, f.name); });
     if (selectedVideo) fd.append('video', selectedVideo, selectedVideo.name);
 
@@ -188,9 +193,13 @@
         if (res.d && res.d.ok) {
           // نجاح فعلي بعد الحفظ على الخادم
           $('ptitle').value = ''; $('plocation').value = ''; $('pdescription').value = '';
+          if ($('pprice')) $('pprice').value = '';
+          if ($('prooms')) $('prooms').value = '';
+          if ($('parea')) $('parea').value = '';
           selectedImages = []; selectedVideo = null;
           renderImgPreviews(); renderVidPreviews();
           showMsg($('pub-msg'), 'تم نشر المنشور بنجاح. هيظهر للزوار في كل المتصفحات.', 'ok');
+          loadStats();
         } else if (res.status === 401 || res.status === 403) {
           showMsg($('pub-msg'), (res.d && res.d.error) || 'انتهت الجلسة. سجّل الدخول من جديد.', 'err');
           sessionStorage.removeItem('bc_csrf');
@@ -357,6 +366,62 @@
 
   $('status-filter').addEventListener('change', function () { reqFilter = this.value; loadRequests(true); });
   $('refresh-btn').addEventListener('click', function () { loadRequests(true); });
+
+  // ===================== إدارة المنشورات =====================
+  function loadAdminPosts() {
+    fetch('/api/posts').then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) { showMsg($('posts-msg'), d.error || 'خطأ.', 'err'); return; }
+        const list = $('admin-posts-list');
+        $('posts-total').textContent = 'العدد: ' + d.count;
+        if (!d.posts.length) {
+          list.innerHTML = '<div class="empty"><div class="big">🏠</div><h3>مفيش منشورات</h3></div>';
+          return;
+        }
+        list.innerHTML = d.posts.map(function (p) {
+          const thumb = p.coverImage
+            ? '<img class="admin-thumb" src="' + esc(p.coverImage) + '" alt="">'
+            : '<div class="admin-thumb ph">بدون صورة</div>';
+          return '<div class="req-card" data-id="' + esc(p.id) + '">' +
+            '<div class="rc-head">' + thumb +
+            '<div><div class="rc-name">' + esc(p.title) + '</div>' +
+            '<div class="small muted">📍 ' + esc(p.location) + (p.price ? ' — ' + esc(p.price) : '') + '</div></div>' +
+            (p.type ? '<span class="chip chip-review">' + esc(p.type) + '</span>' : '') +
+            '</div>' +
+            '<div class="rc-actions">' +
+              '<a class="btn btn-outline btn-sm" href="/detail.html?id=' + encodeURIComponent(p.id) + '" target="_blank" rel="noopener">عرض</a>' +
+              '<button class="btn btn-ghost-danger btn-sm del-post" type="button">حذف</button>' +
+            '</div></div>';
+        }).join('');
+      })
+      .catch(function () { showMsg($('posts-msg'), 'تعذّر تحميل المنشورات.', 'err'); });
+  }
+
+  $('admin-posts-list').addEventListener('click', function (e) {
+    const btn = e.target.closest('.del-post');
+    if (!btn) return;
+    const card = btn.closest('.req-card');
+    const id = card.dataset.id;
+    if (!confirm('حذف المنشور نهائيًا مع صوره؟')) return;
+    btn.disabled = true;
+    fetch('/api/admin/posts/' + encodeURIComponent(id), {
+      method: 'DELETE',
+      headers: apiHeaders(false)
+    }).then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.ok) {
+          showMsg($('posts-msg'), 'تم حذف المنشور.', 'ok');
+          loadAdminPosts();
+          loadStats();
+        } else {
+          btn.disabled = false;
+          showMsg($('posts-msg'), d.error || 'تعذّر الحذف.', 'err');
+        }
+      })
+      .catch(function () { btn.disabled = false; showMsg($('posts-msg'), 'تعذّر الحذف.', 'err'); });
+  });
+
+  $('refresh-posts-btn').addEventListener('click', function () { loadAdminPosts(); });
 
   // ---- تشغيل ----
   checkSession();

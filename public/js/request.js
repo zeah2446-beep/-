@@ -9,6 +9,7 @@
 
   let myToken = null;
   let currentSubmitKey = '';
+  fetchToken();
 
   function showMsg(text, type) {
     msg.textContent = text || '';
@@ -77,11 +78,16 @@
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
         resetBtn();
+        currentSubmitKey = '';
+        myToken = null;
+        fetchToken();
         showMsg((res.d && res.d.error) || 'لم يتم حفظ الطلب. حاول مجددًا.', 'err');
       }
     }).catch(function (err) {
       resetBtn();
       currentSubmitKey = '';
+      myToken = null;
+      fetchToken();
       if (err && err.message === 'notoken') {
         showMsg('تعذّر تجهيز النموذج. حدّث الصفحة وحاول تاني.', 'err');
       } else {
