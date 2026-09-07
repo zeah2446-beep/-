@@ -96,7 +96,37 @@ ck "حفظ حالة الطلب ok=true" $([ "$uok" = "True" ] && echo 1 || echo 
 echo "15) إدخال بيانات مخربي لا يُنفَّذ (نص آمن في الواجهة تُدار بالمتصفح) — نتحقق أن العرض يمر بلا مشكلة"
 echo "   (التحقق من عدم التنفيذ يتم في المتصفح عبر textContent) - مذكور في التقارير"
 
-echo "16) تسجيل الخروج"
+echo "16) قسم الروابط: قراءة عامة للروابط الحقيقية فقط"
+sl=$(curl -s "$B/api/site-links")
+slinfo=$(echo "$sl" | python3 -c "import sys,json;d=json.load(sys.stdin);ids=[l['id'] for l in d.get('links',[])];print(d.get('ok'), 'whatsapp' in ids, any(x in ids for x in ('facebook','instagram','youtube')))")
+ck "GET /api/site-links ok مع واتساب الحقيقي بدون روابط وهمية" $(echo "$slinfo" | grep -q "^True True False" && echo 1 || echo 0)
+wa=$(echo "$sl" | python3 -c "import sys,json;d=json.load(sys.stdin);print([l['url'] for l in d['links'] if l['id']=='whatsapp'][0])")
+ck "واتساب على الرقم الحقيقي" $([ "$wa" = "https://wa.me/201552099055" ] && echo 1 || echo 0)
+
+echo "17) تعديل الروابط مش متاح إلا بالإدارة"
+code=$(curl -s -o /dev/null -w "%{http_code}" -X PUT "$B/api/admin/site-links" -H 'Content-Type: application/json' -d '{"links":{}}')
+ck "بلا جلسة -> 401" $([ "$code" = "401" ] && echo 1 || echo 0)
+code=$(curl -s -o /dev/null -w "%{http_code}" -b $J -X PUT "$B/api/admin/site-links" -H 'Content-Type: application/json' -d '{"links":{}}')
+ck "بلا CSRF -> 403" $([ "$code" = "403" ] && echo 1 || echo 0)
+
+echo "18) رابط غير صالح مرفوض (400)"
+code=$(curl -s -o /dev/null -w "%{http_code}" -b $J -X PUT "$B/api/admin/site-links" -H "X-CSRF-Token: $csrf" -H 'Content-Type: application/json' -d '{"links":{"facebook":"javascript:alert(1)"}}')
+ck "javascript: rejected -> 400" $([ "$code" = "400" ] && echo 1 || echo 0)
+
+echo "19) تغيير رابط من الإدارة بيتطبق على القراءة العامة"
+up=$(curl -s -b $J -X PUT "$B/api/admin/site-links" -H "X-CSRF-Token: $csrf" -H 'Content-Type: application/json' -d '{"links":{"gmail":"baytak@gmail.com"}}')
+upok=$(echo "$up" | python3 -c "import sys,json;print(json.load(sys.stdin).get('ok'))")
+ck "حفظ الجيميل ok=true" $([ "$upok" = "True" ] && echo 1 || echo 0)
+gm=$(curl -s "$B/api/site-links" | python3 -c "import sys,json;d=json.load(sys.stdin);print([l['url'] for l in d['links'] if l['id']=='gmail'][0])")
+ck "الجيميل ظاهر للزوار كـ mailto" $([ "$gm" = "mailto:baytak@gmail.com" ] && echo 1 || echo 0)
+# نرجّع الجيميل فاضي (مفيش إيميل حقيقي محفوظ في الكود)
+curl -s -o /dev/null -b $J -X PUT "$B/api/admin/site-links" -H "X-CSRF-Token: $csrf" -H 'Content-Type: application/json' -d '{"links":{"gmail":""}}'
+
+echo "20) مفيش منشورات تجريبية وهمية"
+dcount=$(curl -s "$B/api/posts" | python3 -c "import sys,json;d=json.load(sys.stdin);print(sum(1 for p in d['posts'] if p.get('demo') or 'تجريبي' in (p.get('title') or '')))")
+ck "عدد المنشورات التجريبية = 0" $([ "${dcount:-0}" = "0" ] && echo 1 || echo 0)
+
+echo "21) تسجيل الخروج"
 lo=$(curl -s -b $J -c $J -X POST "$B/api/admin/logout")
 ck "خروج ok=true" $([ "$lo" = '{"ok":true}' ] && echo 1 || echo 0)
 sess=$(curl -s -b $J "$B/api/admin/session" | python3 -c "import sys,json;print(json.load(sys.stdin).get('authenticated'))")

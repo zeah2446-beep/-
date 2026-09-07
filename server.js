@@ -12,7 +12,7 @@ const express = require('express');
 const cookieSession = require('cookie-session');
 const multer = require('multer');
 const { verifyPassword, hashPassword } = require('./lib/passwords');
-const { seedIfEmpty } = require('./scripts/seed');
+const social = require('./lib/social');
 
 const ROOT = __dirname;
 const IS_SERVERLESS = !!(process.env.VERCEL || process.env.NOW_REGION);
@@ -21,6 +21,7 @@ const DATA_DIR = IS_SERVERLESS ? path.join('/tmp', 'baytak-data') : path.join(RO
 const UPLOADS_DIR = IS_SERVERLESS ? path.join('/tmp', 'baytak-uploads') : path.join(ROOT, 'uploads');
 const POSTS_FILE = path.join(DATA_DIR, 'posts.json');
 const REQUESTS_FILE = path.join(DATA_DIR, 'requests.json');
+const LINKS_FILE = path.join(DATA_DIR, 'site-links.json');
 const CONFIG_FILE = IS_SERVERLESS ? path.join('/tmp', 'baytak-config.json') : path.join(ROOT, 'config.json');
 
 const PORT = process.env.PORT || 3000;
@@ -32,11 +33,9 @@ const LOGIN_BLOCK_MS = 10 * 60 * 1000;
 const REQUEST_WINDOW_MS = 15 * 60 * 1000;
 const REQUEST_RATE_LIMIT = 5;
 
-const MAX_IMAGES = 8;
-const MAX_VIDEOS = 1;
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
-const MAX_POST_MEDIA_BYTES = 40 * 1024 * 1024;
+const MAX_IMAGES = 40;
+const MAX_VIDEOS = 5;
+const MAX_FILE_BYTES = 2 * 1024 * 1024 * 1024;
 const ALLOWED_TYPES = ['إيجار', 'بيع', 'أخرى'];
 const EXPIRED_TOKENS = 60 * 60 * 1000;
 
@@ -83,6 +82,23 @@ function ensureFiles() {
   if (!fs.existsSync(POSTS_FILE)) fs.writeFileSync(POSTS_FILE, '[]', 'utf8');
   if (!fs.existsSync(REQUESTS_FILE)) fs.writeFileSync(REQUESTS_FILE, '[]', 'utf8');
 }
+function isPlaceholderSocial(url) {
+  const s = String(url || '').toLowerCase();
+  return /baytak\.3andna|baytak_3andna|baytak-3andna/.test(s);
+}
+function loadSiteLinks() {
+  const base = social.defaultLinks();
+  const stored = readJSON(LINKS_FILE, null);
+  if (stored && typeof stored === 'object' && !Array.isArray(stored)) {
+    for (const p of social.PLATFORMS) {
+      const v = social.normalizeLink(stored[p.id], p.id);
+      if (v === null || isPlaceholderSocial(v)) continue;
+      if (Object.prototype.hasOwnProperty.call(stored, p.id)) base[p.id] = v;
+    }
+  }
+  try { atomicWrite(LINKS_FILE, base); } catch (e) { /* تجاهل */ }
+  return base;
+}
 function readJSON(file, fallback) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
   catch (e) { return fallback; }
@@ -96,15 +112,32 @@ function enqueueSave(file, data) {
   writeQueue = writeQueue.then(() => atomicWrite(file, data));
   return writeQueue;
 }
+let siteLinks = null; // روابط المنصة (تُقرأ مع البيانات)
+
+function isFakePost(p) {
+  if (!p) return true;
+  if (p.demo === true) return true;
+  const id = String(p.id || '');
+  if (id.startsWith('demo-') || id.startsWith('post-')) return true;
+  const title = String(p.title || '');
+  if (title.indexOf('تجريبي') !== -1) return true;
+  const imgs = (p.media && p.media.images) || [];
+  if (imgs.some((u) => String(u).indexOf('/demo-media/') === 0 || String(u).indexOf('/listings-media/') === 0)) return true;
+  return false;
+}
+
 function loadData() {
   ensureFiles();
   posts = readJSON(POSTS_FILE, []);
   requests = readJSON(REQUESTS_FILE, []);
   if (!Array.isArray(posts)) posts = [];
   if (!Array.isArray(requests)) requests = [];
-  if (posts.length === 0) {
-    posts = seedIfEmpty({ posts, postsFile: POSTS_FILE }) || [];
+  const cleaned = posts.filter((p) => !isFakePost(p));
+  if (cleaned.length !== posts.length) {
+    posts = cleaned;
+    try { atomicWrite(POSTS_FILE, posts); } catch (e) { /* تجاهل */ }
   }
+  siteLinks = loadSiteLinks();
 }
 
 function sanitizeIp(ip) {
@@ -154,6 +187,37 @@ function saveMediaBuffer(buf, ext, kind) {
   const name = kind + '-' + crypto.randomBytes(8).toString('hex') + '.' + ext;
   fs.writeFileSync(path.join(UPLOADS_DIR, name), buf);
   return name;
+}
+function readFileHead(filePath, n) {
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    const buf = Buffer.alloc(n);
+    const bytes = fs.readSync(fd, buf, 0, n, 0);
+    return buf.subarray(0, bytes);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+function persistUploadedFile(file, kind) {
+  const head = file.path ? readFileHead(file.path, 32) : (file.buffer && file.buffer.subarray(0, 32));
+  const ext = kind === 'img' ? detectImage(head) : detectVideo(head);
+  if (!ext) {
+    if (file.path) { try { fs.unlinkSync(file.path); } catch (e) { /* تجاهل */ } }
+    return null;
+  }
+  const name = kind + '-' + crypto.randomBytes(8).toString('hex') + '.' + ext;
+  const dest = path.join(UPLOADS_DIR, name);
+  if (file.path) {
+    fs.renameSync(file.path, dest);
+  } else {
+    fs.writeFileSync(dest, file.buffer);
+  }
+  return name;
+}
+function discardUpload(file) {
+  if (file && file.path) {
+    try { fs.unlinkSync(file.path); } catch (e) { /* تجاهل */ }
+  }
 }
 
 function checkLoginRate(ip) {
@@ -306,6 +370,14 @@ app.get('/api/posts/:id', (req, res) => {
   res.json({ ok: true, post });
 });
 
+// روابط المنصة على السوشيال ميديا (قراءة عامة — العرض فقط)
+app.get('/api/site-links', (req, res) => {
+  const links = social.PLATFORMS
+    .filter((p) => siteLinks && siteLinks[p.id])
+    .map((p) => ({ id: p.id, name: p.name, url: siteLinks[p.id] }));
+  res.json({ ok: true, links });
+});
+
 app.post('/api/requests', (req, res) => {
   const ip = sanitizeIp(req.ip);
   pruneTokens();
@@ -409,16 +481,38 @@ app.patch('/api/admin/requests/:id', requireAdmin, requireCsrf, (req, res) => {
   }).catch(() => res.status(500).json({ ok: false, error: 'تعذّر الحفظ.' }));
 });
 
+// ---- روابط السوشيال ميديا (تعديل من الإدارة فقط) ----
+app.get('/api/admin/site-links', requireAdmin, (req, res) => {
+  const platforms = social.PLATFORMS.map((p) => ({
+    id: p.id,
+    name: p.name,
+    url: (siteLinks && siteLinks[p.id]) || '',
+  }));
+  res.json({ ok: true, platforms });
+});
+
+app.put('/api/admin/site-links', requireAdmin, requireCsrf, (req, res) => {
+  const errors = [];
+  const next = social.buildLinks((req.body || {}).links, siteLinks, errors);
+  if (!next) return res.status(400).json({ ok: false, error: errors[0], errors });
+  siteLinks = next;
+  enqueueSave(LINKS_FILE, next).then(() => {
+    res.json({ ok: true, message: 'تم حفظ الروابط — هيظهروا على الموقع فورًا.' });
+  }).catch(() => res.status(500).json({ ok: false, error: 'تعذّر حفظ الروابط على الخادم.' }));
+});
+
 const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_VIDEO_BYTES, files: MAX_IMAGES + MAX_VIDEOS }
+  storage: multer.diskStorage({
+    destination: function (req, file, cb) { cb(null, UPLOADS_DIR); },
+    filename: function (req, file, cb) { cb(null, 'tmp-' + crypto.randomBytes(12).toString('hex')); }
+  }),
+  limits: { fileSize: MAX_FILE_BYTES, files: MAX_IMAGES + MAX_VIDEOS }
 });
 
 app.post('/api/admin/posts', requireAdmin, requireCsrf, (req, res) => {
   upload.any()(req, res, (err) => {
     if (err) {
-      if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ ok: false, error: 'أحد الملفات أكبر من الحد المسموح (صورة 5MB / فيديو 20MB).' });
-      if (err.code === 'LIMIT_FILE_COUNT') return res.status(413).json({ ok: false, error: 'عدد الملفات يتجاوز الحد (حتى 8 صور وفيديو واحد).' });
+      if (err.code === 'LIMIT_FILE_COUNT') return res.status(413).json({ ok: false, error: 'عدد الملفات كبير جدًا (حتى 40 صورة و5 فيديوهات لكل منشور).' });
       return res.status(400).json({ ok: false, error: 'خطأ في رفع الملفات: ' + err.message });
     }
     handleCreatePost(req, res);
@@ -463,36 +557,31 @@ function handleCreatePost(req, res) {
   const files = Array.isArray(req.files) ? req.files : [];
   const images = files.filter((f) => f.fieldname === 'images');
   const videos = files.filter((f) => f.fieldname === 'video');
-  if (images.length > MAX_IMAGES) errors.push('عدد الصور يتجاوز 8.');
-  if (videos.length > MAX_VIDEOS) errors.push('فيديو واحد فقط لكل منشور.');
+  if (images.length > MAX_IMAGES) errors.push('عدد الصور يتجاوز 40.');
+  if (videos.length > MAX_VIDEOS) errors.push('حتى 5 فيديوهات لكل منشور.');
 
-  let mediaTotal = 0;
-  const media = { images: [], videos: [] };
-  if (files.length) {
-    for (const f of images) {
-      const ext = detectImage(f.buffer);
-      if (!ext) { errors.push('أحد الصور غير مدعوم (JPG/PNG/WebP فقط).'); continue; }
-      if (f.size > MAX_IMAGE_BYTES) { errors.push('صورة أكبر من 5 ميجابايت.'); continue; }
-      mediaTotal += f.size;
-      media.images.push(f);
-    }
-    for (const f of videos) {
-      const ext = detectVideo(f.buffer);
-      if (!ext) { errors.push('الفيديو غير مدعوم (MP4/WebM فقط).'); continue; }
-      if (f.size > MAX_VIDEO_BYTES) { errors.push('الفيديو أكبر من 20 ميجابايت.'); continue; }
-      mediaTotal += f.size;
-      media.videos.push({ f, ext });
-    }
-    if (mediaTotal > MAX_POST_MEDIA_BYTES) errors.push('إجمالي الوسائط يتجاوز 40 ميجابايت.');
+  if (errors.length) {
+    files.forEach(discardUpload);
+    return res.status(400).json({ ok: false, error: errors[0], errors });
   }
-  if (errors.length) return res.status(400).json({ ok: false, error: errors[0], errors });
 
   const saved = { images: [], videos: [] };
-  for (const f of media.images) {
-    saved.images.push('/media/' + saveMediaBuffer(f.buffer, detectImage(f.buffer), 'img'));
+  for (const f of images) {
+    const name = persistUploadedFile(f, 'img');
+    if (!name) { errors.push('أحد الصور غير مدعوم (JPG/PNG/WebP فقط).'); continue; }
+    saved.images.push('/media/' + name);
   }
-  for (const v of media.videos) {
-    saved.videos.push('/media/' + saveMediaBuffer(v.f.buffer, v.ext, 'vid'));
+  for (const f of videos) {
+    const name = persistUploadedFile(f, 'vid');
+    if (!name) { errors.push('أحد الفيديوهات غير مدعوم (MP4/WebM فقط).'); continue; }
+    saved.videos.push('/media/' + name);
+  }
+  if (errors.length) {
+    [...saved.images, ...saved.videos].forEach((m) => {
+      try { fs.unlinkSync(path.join(UPLOADS_DIR, path.basename(m))); } catch (e) { /* تجاهل */ }
+    });
+    files.forEach(discardUpload);
+    return res.status(400).json({ ok: false, error: errors[0], errors });
   }
 
   const now = Date.now();
@@ -509,7 +598,7 @@ function handleCreatePost(req, res) {
   });
 }
 
-app.get('/api/health', (req, res) => res.json({ ok: true, service: 'بيتك عندنا', up: true }));
+app.get('/api/health', (req, res) => res.json({ ok: true, service: 'بيتك عندنا', up: true, hosting: IS_SERVERLESS ? 'vercel' : 'server' }));
 app.get('/', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
 app.get('/listings', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'listings.html')));
 app.get('/detail', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'detail.html')));
@@ -522,6 +611,16 @@ app.use((req, res) => {
     return res.status(404).sendFile(path.join(PUBLIC_DIR, '404.html'));
   }
   res.status(404).json({ ok: false, error: 'غير موجود.' });
+});
+
+// مصدّق أخطاء موحّد (JSON دايمًا) — عشان الواجهة تعرف توضح السبب بدل «تعذّر الاتصال»
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  if (err && (err.type === 'entity.too.large' || err.status === 413 || err.code === 'LIMIT_FILE_SIZE')) {
+    return res.status(413).json({ ok: false, error: 'تعذّر رفع الملف على هذا الخادم. استخدم استضافة Node حقيقية (VPS) عشان الصور والفيديوهات الكبيرة تتحفظ.' });
+  }
+  console.error(err);
+  res.status(500).json({ ok: false, error: 'خطأ غير متوقع في الخادم. حاول تاني.' });
 });
 
 loadData();

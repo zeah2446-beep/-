@@ -47,6 +47,7 @@
         <button type="button" data-tab="add" class="active">إضافة منشور</button>
         <button type="button" data-tab="posts">المنشورات</button>
         <button type="button" data-tab="requests">طلبات الشقق</button>
+        <button type="button" data-tab="links">روابط السوشيال</button>
       </div>
 
       <!-- تبويب: إضافة منشور -->
@@ -61,7 +62,7 @@
             </div>
             <div class="field">
               <label for="plocation">مكان الشقة <span class="req">*</span></label>
-              <input id="plocation" type="text" maxlength="150" placeholder="المكان/الحي">
+              <input id="plocation" type="text" maxlength="150" placeholder="مثال: المنصورة، أو حي الجامعة">
               <div class="hint">من 2 لـ 150 حرف.</div>
             </div>
             <div class="field">
@@ -90,7 +91,7 @@
               <div class="hint">من 10 لـ 4000 حرف.</div>
             </div>
             <div class="field">
-              <label>الصور <span class="small muted">(اختياري — حتى 8، كل صورة حتى 5MB)</span></label>
+              <label>الصور <span class="small muted">(اختياري — ارفع براحتك، مفيش حد للحجم)</span></label>
               <div class="file-picker" id="img-picker">
                 <div>🖼️ اضغط لاختيار صور (JPG / PNG / WebP)</div>
                 <input type="file" id="pimages" accept="image/jpeg,image/png,image/webp" multiple>
@@ -98,15 +99,45 @@
               <div class="media-previews" id="img-previews"></div>
             </div>
             <div class="field">
-              <label>الفيديو <span class="small muted">(اختياري — فيديو واحد حتى 20MB)</span></label>
+              <label>الفيديو <span class="small muted">(اختياري — ارفع براحتك، مفيش حد للحجم)</span></label>
               <div class="file-picker" id="vid-picker">
                 <div>🎬 اضغط لاختيار فيديو (MP4 / WebM)</div>
-                <input type="file" id="pvideo" accept="video/mp4,video/webm">
+                <input type="file" id="pvideo" accept="video/mp4,video/webm" multiple>
               </div>
               <div class="media-previews" id="vid-previews"></div>
             </div>
             <button class="btn btn-block btn-lg" id="post-btn" type="submit">نشر المنشور 🚀</button>
           </form>
+        </div>
+      </section>
+
+      <!-- تبويب: المنشورات (عرض/حذف) -->
+      <section id="tab-posts" class="panel">
+        <div class="filter-bar">
+          <span class="small muted" id="posts-total"></span>
+          <span style="flex:1"></span>
+          <button class="btn btn-outline btn-sm" id="refresh-posts-btn" type="button">↻ تحديث</button>
+        </div>
+        <div id="posts-msg" class="msg"></div>
+        <div id="admin-posts-list"></div>
+      </section>
+
+      <!-- تبويب: روابط السوشيال ميديا -->
+      <section id="tab-links" class="panel">
+        <div class="detail-card">
+          <h2 class="section-title" style="margin-top:0">روابط السوشيال ميديا</h2>
+          <p class="muted small" style="margin-top:0">
+            دي الروابط اللي بتظهر للزوار في قسم «تابعنا» (الصفحة الرئيسية والفوتر).
+            غيّر الرابط لأي حاجة، واترك أي حقل فاضي عشان تختفي المنصة دي من الموقع.
+            أي حفظ هنا بيتطبَّق فورًا على كل الصفحات.
+          </p>
+          <div id="links-msg" class="msg"></div>
+          <div id="links-fields"><div class="empty" style="padding:18px"><p>جارٍ تحميل الروابط…</p></div></div>
+          <button class="btn btn-block btn-lg" id="links-save" type="button">حفظ الروابط 💾</button>
+          <div class="mt3">
+            <div class="sec-label">معاينة (هيكيبقى شكله في الموقع):</div>
+            <div id="links-preview"></div>
+          </div>
         </div>
       </section>
 
