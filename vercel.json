@@ -1,12 +1,20 @@
 {
+  "version": 2,
   "buildCommand": "node scripts/build-vercel.js",
-  "outputDirectory": "output",
-  "rewrites": [
-    { "source": "/media/(.*)", "destination": "/api" }
-  ],
-  "functions": {
-    "api/index.js": {
-      "maxDuration": 30
+  "builds": [
+    {
+      "src": "api/index.js",
+      "use": "@vercel/node",
+      "config": { "maxDuration": 30 }
+    },
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "output" }
     }
-  }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/index.js" },
+    { "src": "/media/(.*)", "dest": "/api/index.js" }
+  ]
 }
