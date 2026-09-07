@@ -367,6 +367,49 @@ input, textarea, select { font-family: inherit; font-size: 1rem; }
 }
 .refbox .ref { font-size: 1.5rem; font-weight: 900; color: var(--teal-dark); letter-spacing: 1px; direction: ltr; }
 
+/* ============ قسم روابط السوشيال ميديا ============ */
+.social {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 18px; margin-top: 16px;
+}
+.social-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; }
+.social-btn {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 12px 14px; border-radius: 12px;
+  border: 1.5px solid var(--line); background: var(--cream);
+  font-weight: 800; font-size: .95rem; color: var(--teal-dark);
+  transition: transform .12s ease, background .15s ease, border-color .15s ease;
+}
+.social-btn svg { width: 22px; height: 22px; flex: 0 0 auto; fill: var(--teal-dark); }
+.social-btn:hover { transform: translateY(-1px); border-color: var(--teal); background: var(--green-soft); }
+.social-btn:hover svg { fill: var(--teal); }
+
+/* شريط الأيقونات في الفوتر */
+.footer-social {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  flex-wrap: wrap; padding: 10px 0 8px;
+}
+.footer-social-label { font-size: .78rem; color: var(--muted); margin-left: 4px; }
+.footer-social a {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--cream); border: 1px solid var(--line);
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background .15s ease, border-color .15s ease, transform .12s ease;
+}
+.footer-social a svg { width: 16px; height: 16px; fill: var(--teal-dark); }
+.footer-social a:hover { background: var(--teal); border-color: var(--teal); transform: translateY(-1px); }
+.footer-social a:hover svg { fill: #fff; }
+
+/* معاينة الروابط داخل لوحة الإدارة */
+.social-preview { display: flex; gap: 8px; flex-wrap: wrap; }
+.social-preview .social-btn { padding: 9px 12px; font-size: .88rem; }
+.social-preview .social-btn svg { width: 18px; height: 18px; }
+
+/* الإدارة: شارة المنشور التجريبي */
+.chip-demo { background: #f3e8f7; color: #7a3f8f; border: 1px dashed #cfa8d6; }
+.link-field label { display: flex; align-items: center; gap: 8px; }
+.link-field label svg { width: 18px; height: 18px; fill: var(--teal-dark); flex: 0 0 auto; }
+
 /* footer */
 footer { text-align:center; color: var(--muted); font-size:.8rem; padding: 10px 16px 6px; border-top:1px solid var(--line); margin-top: 8px; }
 

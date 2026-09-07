@@ -13,6 +13,8 @@ const cookieSession = require('cookie-session');
 const multer = require('multer');
 const { verifyPassword, hashPassword } = require('./lib/passwords');
 const { seedIfEmpty } = require('./scripts/seed');
+const { seedDemoIfAbsent } = require('./scripts/demo');
+const social = require('./lib/social');
 
 const ROOT = __dirname;
 const IS_SERVERLESS = !!(process.env.VERCEL || process.env.NOW_REGION);
@@ -21,6 +23,8 @@ const DATA_DIR = IS_SERVERLESS ? path.join('/tmp', 'baytak-data') : path.join(RO
 const UPLOADS_DIR = IS_SERVERLESS ? path.join('/tmp', 'baytak-uploads') : path.join(ROOT, 'uploads');
 const POSTS_FILE = path.join(DATA_DIR, 'posts.json');
 const REQUESTS_FILE = path.join(DATA_DIR, 'requests.json');
+const LINKS_FILE = path.join(DATA_DIR, 'site-links.json');
+const DEMO_REMOVED_FILE = path.join(DATA_DIR, 'demo-removed.flag');
 const CONFIG_FILE = IS_SERVERLESS ? path.join('/tmp', 'baytak-config.json') : path.join(ROOT, 'config.json');
 
 const PORT = process.env.PORT || 3000;
@@ -83,6 +87,18 @@ function ensureFiles() {
   if (!fs.existsSync(POSTS_FILE)) fs.writeFileSync(POSTS_FILE, '[]', 'utf8');
   if (!fs.existsSync(REQUESTS_FILE)) fs.writeFileSync(REQUESTS_FILE, '[]', 'utf8');
 }
+function loadSiteLinks() {
+  const base = social.defaultLinks();
+  const stored = readJSON(LINKS_FILE, null);
+  if (stored && typeof stored === 'object' && !Array.isArray(stored)) {
+    for (const p of social.PLATFORMS) {
+      const v = social.normalizeLink(stored[p.id]);
+      if (v !== null) base[p.id] = v; // قيمة غير صالحة متخزنة → نلتزم بالافتراضي
+    }
+  }
+  if (!fs.existsSync(LINKS_FILE)) atomicWrite(LINKS_FILE, base);
+  return base;
+}
 function readJSON(file, fallback) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
   catch (e) { return fallback; }
@@ -96,6 +112,8 @@ function enqueueSave(file, data) {
   writeQueue = writeQueue.then(() => atomicWrite(file, data));
   return writeQueue;
 }
+let siteLinks = null; // روابط المنصة (تُقرأ مع البيانات)
+
 function loadData() {
   ensureFiles();
   posts = readJSON(POSTS_FILE, []);
@@ -105,6 +123,9 @@ function loadData() {
   if (posts.length === 0) {
     posts = seedIfEmpty({ posts, postsFile: POSTS_FILE }) || [];
   }
+  // منشورات تجريبية (بيانات وهمية) تُضاف مرة واحدة لو مش موجودة — تحذف من الإدارة
+  posts = seedDemoIfAbsent({ posts, postsFile: POSTS_FILE, demoRemovedFile: DEMO_REMOVED_FILE }) || posts;
+  siteLinks = loadSiteLinks();
 }
 
 function sanitizeIp(ip) {
@@ -294,6 +315,7 @@ app.get('/api/posts', (req, res) => {
       imageCount: (p.media && p.media.images ? p.media.images.length : 0),
       videoCount: (p.media && p.media.videos ? p.media.videos.length : 0),
       hasVideo: !!(p.media && p.media.videos && p.media.videos.length),
+      demo: p.demo === true,
       coverImage: (p.media && p.media.images && p.media.images[0]) || null,
       preview: String(p.description || '').split('\n').filter((l) => l.trim()).slice(0, 3).join('\n').slice(0, 220)
     }));
@@ -304,6 +326,14 @@ app.get('/api/posts/:id', (req, res) => {
   const post = posts.find((p) => p.id === req.params.id);
   if (!post) return res.status(404).json({ ok: false, error: 'المنشور غير موجود.' });
   res.json({ ok: true, post });
+});
+
+// روابط المنصة على السوشيال ميديا (قراءة عامة — العرض فقط)
+app.get('/api/site-links', (req, res) => {
+  const links = social.PLATFORMS
+    .filter((p) => siteLinks && siteLinks[p.id])
+    .map((p) => ({ id: p.id, name: p.name, url: siteLinks[p.id] }));
+  res.json({ ok: true, links });
 });
 
 app.post('/api/requests', (req, res) => {
@@ -409,6 +439,26 @@ app.patch('/api/admin/requests/:id', requireAdmin, requireCsrf, (req, res) => {
   }).catch(() => res.status(500).json({ ok: false, error: 'تعذّر الحفظ.' }));
 });
 
+// ---- روابط السوشيال ميديا (تعديل من الإدارة فقط) ----
+app.get('/api/admin/site-links', requireAdmin, (req, res) => {
+  const platforms = social.PLATFORMS.map((p) => ({
+    id: p.id,
+    name: p.name,
+    url: (siteLinks && siteLinks[p.id]) || '',
+  }));
+  res.json({ ok: true, platforms });
+});
+
+app.put('/api/admin/site-links', requireAdmin, requireCsrf, (req, res) => {
+  const errors = [];
+  const next = social.buildLinks((req.body || {}).links, siteLinks, errors);
+  if (!next) return res.status(400).json({ ok: false, error: errors[0], errors });
+  siteLinks = next;
+  enqueueSave(LINKS_FILE, next).then(() => {
+    res.json({ ok: true, message: 'تم حفظ الروابط — هيظهروا على الموقع فورًا.' });
+  }).catch(() => res.status(500).json({ ok: false, error: 'تعذّر حفظ الروابط على الخادم.' }));
+});
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_VIDEO_BYTES, files: MAX_IMAGES + MAX_VIDEOS }
@@ -422,6 +472,37 @@ app.post('/api/admin/posts', requireAdmin, requireCsrf, (req, res) => {
       return res.status(400).json({ ok: false, error: 'خطأ في رفع الملفات: ' + err.message });
     }
     handleCreatePost(req, res);
+  });
+});
+
+// إعادة إضافة المنشورات التجريبية (لو الإدارة شالتها من قبل)
+app.post('/api/admin/demo-posts', requireAdmin, requireCsrf, (req, res) => {
+  try { fs.unlinkSync(DEMO_REMOVED_FILE); } catch (e) { /* ignore */ }
+  const before = posts.length;
+  posts = seedDemoIfAbsent({ posts, postsFile: POSTS_FILE }) || posts;
+  const added = posts.length - before;
+  if (!added) return res.json({ ok: true, message: 'المنشورات التجريبية موجودة بالفعل.' });
+  res.json({ ok: true, message: 'تمت إضافة ' + added + ' منشورات تجريبية.' });
+});
+
+// حذف كل المنشورات التجريبية (البيانات الوهمية) بضغطة واحدة من الإدارة
+app.delete('/api/admin/demo-posts', requireAdmin, requireCsrf, (req, res) => {
+  const removed = posts.filter((p) => p.demo === true);
+  posts = posts.filter((p) => p.demo !== true);
+  const mediaFiles = removed.reduce((acc, p) => acc.concat(
+    ((p.media && p.media.images) || []),
+    ((p.media && p.media.videos) || [])
+  ), []);
+  enqueueSave(POSTS_FILE, posts).then(() => {
+    // وسائط التجريبية من public/demo-media (مش uploads) — لو فيه أي ملف في uploads نزلو معاه
+    mediaFiles.forEach((m) => {
+      try { fs.unlinkSync(path.join(UPLOADS_DIR, path.basename(m))); } catch (e) { /* تجاهل */ }
+    });
+    // علّامة "اتحذفت": حتى لو اتعمل restart/استضافة جديدة، التجريبيات ما ترجعش
+    try { fs.writeFileSync(DEMO_REMOVED_FILE, JSON.stringify({ removedAt: Date.now() }), 'utf8'); } catch (e) { /* تجاهل */ }
+    res.json({ ok: true, message: 'تم حذف ' + removed.length + ' منشورات تجريبية.' });
+  }).catch(() => {
+    res.status(500).json({ ok: false, error: 'تعذّر حذف المنشورات التجريبية.' });
   });
 });
 

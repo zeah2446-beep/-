@@ -109,6 +109,7 @@
       $('tab-' + tab).classList.add('active');
       if (tab === 'requests') loadRequests(true);
       if (tab === 'posts') loadAdminPosts();
+      if (tab === 'links') loadLinksTab();
     });
   });
 
@@ -374,6 +375,9 @@
         if (!d.ok) { showMsg($('posts-msg'), d.error || 'خطأ.', 'err'); return; }
         const list = $('admin-posts-list');
         $('posts-total').textContent = 'العدد: ' + d.count;
+        const demoCount = d.posts.filter(function (p) { return p.demo; }).length;
+        $('delete-demo-btn').style.display = demoCount ? '' : 'none';
+        $('restore-demo-btn').style.display = demoCount ? 'none' : '';
         if (!d.posts.length) {
           list.innerHTML = '<div class="empty"><div class="big">🏠</div><h3>مفيش منشورات</h3></div>';
           return;
@@ -386,6 +390,7 @@
             '<div class="rc-head">' + thumb +
             '<div><div class="rc-name">' + esc(p.title) + '</div>' +
             '<div class="small muted">📍 ' + esc(p.location) + (p.price ? ' — ' + esc(p.price) : '') + '</div></div>' +
+            (p.demo ? '<span class="chip chip-demo" title="بيانات وهمية قابلة للحذف">تجريبي</span>' : '') +
             (p.type ? '<span class="chip chip-review">' + esc(p.type) + '</span>' : '') +
             '</div>' +
             '<div class="rc-actions">' +
@@ -422,6 +427,154 @@
   });
 
   $('refresh-posts-btn').addEventListener('click', function () { loadAdminPosts(); });
+
+  // ---- حذف كل المنشورات التجريبية (بيانات وهمية) بضغطة واحدة ----
+  $('delete-demo-btn').addEventListener('click', function () {
+    const btn = $('delete-demo-btn');
+    if (!confirm('حذف كل المنشورات التجريبية (البيانات الوهمية) نهائيًا؟')) return;
+    btn.disabled = true;
+    clearMsg($('posts-msg'));
+    fetch('/api/admin/demo-posts', {
+      method: 'DELETE',
+      headers: apiHeaders(false)
+    }).then(function (r) { return r.json(); })
+      .then(function (d) {
+        btn.disabled = false;
+        if (d.ok) {
+          showMsg($('posts-msg'), d.message || 'تم حذف المنشورات التجريبية.', 'ok');
+          loadAdminPosts();
+          loadStats();
+        } else {
+          showMsg($('posts-msg'), d.error || 'تعذّر الحذف.', 'err');
+        }
+      })
+      .catch(function () { btn.disabled = false; showMsg($('posts-msg'), 'تعذّر الحذف — تأكد من الاتصال بالخادم.', 'err'); });
+  });
+
+  // ---- إعادة إضافة المنشورات التجريبية ----
+  $('restore-demo-btn').addEventListener('click', function () {
+    const btn = $('restore-demo-btn');
+    btn.disabled = true;
+    clearMsg($('posts-msg'));
+    fetch('/api/admin/demo-posts', {
+      method: 'POST',
+      headers: apiHeaders(false)
+    }).then(function (r) { return r.json(); })
+      .then(function (d) {
+        btn.disabled = false;
+        if (d.ok) {
+          showMsg($('posts-msg'), d.message || 'تمت إضافة المنشورات التجريبية.', 'ok');
+          loadAdminPosts();
+          loadStats();
+        } else {
+          showMsg($('posts-msg'), d.error || 'تعذّرت الإضافة.', 'err');
+        }
+      })
+      .catch(function () { btn.disabled = false; showMsg($('posts-msg'), 'تعذّرت الإضافة — تأكد من الاتصال بالخادم.', 'err'); });
+  });
+
+  // ===================== روابط السوشيال ميديا =====================
+  const SOCIAL_ICONS = {
+    facebook: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 21v-8h2.7l.4-3.1h-3.1V7.9c0-.9.3-1.5 1.6-1.5h1.7V3.6c-.3 0-1.3-.1-2.4-.1-2.4 0-4 1.4-4 4v2.4H7.8V13h2.7v8h3z"/></svg>',
+    instagram: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2c3.2 0 3.6 0 4.9.1 1.2.1 1.8.2 2.2.4.6.2 1 .5 1.4.9.4.4.7.8.9 1.4.2.4.4 1 .4 2.2.1 1.3.1 1.7.1 4.8s0 3.6-.1 4.9c-.1 1.2-.2 1.8-.4 2.2-.2.6-.5 1-.9 1.4-.4.4-.8.7-1.4.9-.4.2-1 .4-2.2.4-1.3.1-1.7.1-4.9.1s-3.6 0-4.9-.1c-1.2-.1-1.8-.2-2.2-.4-.6-.2-1-.5-1.4-.9-.4-.4-.7-.8-.9-1.4-.2-.4-.4-1-.4-2.2-.1-1.3-.1-1.7-.1-4.8s0-3.6.1-4.9c.1-1.2.2-1.8.4-2.2.2-.6.5-1 .9-1.4.4-.4.8-.7 1.4-.9.4-.2 1-.4 2.2-.4 1.3-.1 1.7-.1 4.9-.1zm0 1.8c-3.1 0-3.5 0-4.8.1-1.1.1-1.5.2-1.8.3-.5.2-.8.4-1.1.7-.3.3-.5.6-.7 1.1-.1.3-.3.8-.3 1.8-.1 1.3-.1 1.6-.1 4.8s0 3.5.1 4.8c.1 1.1.2 1.5.3 1.8.2.5.4.8.7 1.1.3.3.6.5 1.1.7.3.1.8.3 1.8.3 1.3.1 1.6.1 4.8.1s3.5 0 4.8-.1c1.1-.1 1.5-.2 1.8-.3.5-.2.8-.4 1.1-.7.3-.3.5-.6.7-1.1.1-.3.3-.8.3-1.8.1-1.3.1-1.6.1-4.8s0-3.5-.1-4.8c-.1-1.1-.2-1.5-.3-1.8-.2-.5-.4-.8-.7-1.1-.3-.3-.6-.5-1.1-.7-.3-.1-.8-.3-1.8-.3-1.3-.1-1.6-.1-4.8-.1zm0 3.1a4.9 4.9 0 1 1 0 9.8 4.9 4.9 0 0 1 0-9.8zm0 8.1a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4zm5-8.3a1.1 1.1 0 1 1-2.2 0 1.1 1.1 0 0 1 2.2 0z"/></svg>',
+    tiktok: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.53.02C13.84 0 15.14.01 16.44 0c.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>',
+    x: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.9 1.15h3.68l-8.04 9.19L24 22.85h-7.41l-5.8-7.58-6.64 7.58H.47l8.6-9.83L0 1.15h7.59l5.24 6.93 6.07-6.93zm-1.29 19.5h2.04L6.49 3.24H4.3l13.31 17.41z"/></svg>',
+    youtube: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M23.5 6.19a3.02 3.02 0 0 0-2.12-2.14C19.5 3.55 12 3.55 12 3.55s-7.5 0-9.38.5A3.02 3.02 0 0 0 .5 6.19C0 8.07 0 12 0 12s0 3.93.5 5.81a3.02 3.02 0 0 0 2.12 2.14c1.88.5 9.38.5 9.38.5s7.5 0 9.38-.5a3.02 3.02 0 0 0 2.12-2.14C24 15.93 24 12 24 12s0-3.93-.5-5.81zM9.55 15.57V8.43L15.82 12l-6.27 3.57z"/></svg>',
+    telegram: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11.94 0A12 12 0 1 0 24 12 12 12 0 0 0 11.94 0zm5.87 8.16-1.97 9.3c-.15.66-.54.82-1.09.51l-3-2.21-1.45 1.4c-.16.16-.3.3-.6.3l.21-3.05 5.56-5.02c.24-.21-.05-.33-.37-.12l-6.87 4.33-2.96-.93c-.64-.2-.66-.64.14-.95l11.57-4.46c.53-.19 1 .13.83.9z"/></svg>'
+  };
+
+  let linksData = [];
+
+  function currentLinkInputs() {
+    const out = {};
+    linksData.forEach(function (p) {
+      const el = $('link-url-' + p.id);
+      if (el) out[p.id] = el.value.trim();
+    });
+    return out;
+  }
+
+  function renderLinksFields() {
+    const box = $('links-fields');
+    if (!linksData.length) {
+      box.innerHTML = '<div class="empty" style="padding:18px"><p>مفيش منصات معرّفة.</p></div>';
+      return;
+    }
+    box.innerHTML = linksData.map(function (p) {
+      return '<div class="field link-field">' +
+        '<label for="link-url-' + p.id + '">' + (SOCIAL_ICONS[p.id] || '') + ' ' + esc(p.name) + '</label>' +
+        '<input id="link-url-' + p.id + '" class="ltr" type="text" dir="ltr" style="text-align:left" maxlength="300" ' +
+          'placeholder="https://... (اتركه فاضي عشان تختفي ' + esc(p.name) + ')" value="' + esc(p.url) + '">' +
+        '</div>';
+    }).join('') +
+      '<div class="hint">💡 اكتب الرابط بس — لو نسيت https:// هنضيفها تلقائيًا. الرابط الفاضي بيخفي المنصة من الموقع.</div>';
+  }
+
+  function renderLinksPreview() {
+    const box = $('links-preview');
+    const active = linksData.filter(function (p) {
+      const el = $('link-url-' + p.id);
+      return el && el.value.trim() !== '';
+    });
+    if (!active.length) {
+      box.innerHTML = '<div class="empty" style="padding:14px"><p>كل الروابط فاضية — قسم «تابعنا» هيختفي من الموقع.</p></div>';
+      return;
+    }
+    box.innerHTML =
+      '<div class="social-preview">' +
+        active.map(function (p) {
+          return '<a class="social-btn" href="' + esc(p.url) + '" target="_blank" rel="noopener">' +
+            (SOCIAL_ICONS[p.id] || '') + '<span>' + esc(p.name) + '</span></a>';
+        }).join('') +
+      '</div>';
+  }
+
+  function loadLinksTab() {
+    fetch('/api/admin/site-links', { headers: apiHeaders(false) })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) { showMsg($('links-msg'), d.error || 'خطأ.', 'err'); return; }
+        linksData = d.platforms || [];
+        renderLinksFields();
+        renderLinksPreview();
+        clearMsg($('links-msg'));
+      })
+      .catch(function () { showMsg($('links-msg'), 'تعذّر تحميل الروابط.', 'err'); });
+  }
+
+  // معاينة فورية أثناء الكتابة
+  document.addEventListener('input', function (e) {
+    if (e.target && e.target.id && e.target.id.indexOf('link-url-') === 0) renderLinksPreview();
+  });
+
+  $('links-save').addEventListener('click', function () {
+    const btn = $('links-save');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> جارٍ الحفظ…';
+    clearMsg($('links-msg'));
+    const body = { links: currentLinkInputs() };
+    fetch('/api/admin/site-links', {
+      method: 'PUT',
+      headers: apiHeaders(true),
+      body: JSON.stringify(body)
+    }).then(function (r) { return r.json().then(function (d) { return { status: r.status, d: d }; }); })
+      .then(function (res) {
+        if (res.d && res.d.ok) {
+          showMsg($('links-msg'), res.d.message || 'تم حفظ الروابط.', 'ok');
+        } else if (res.status === 401 || res.status === 403) {
+          showMsg($('links-msg'), 'انتهت الجلسة. سجّل الدخول من جديد.', 'err');
+          sessionStorage.removeItem('bc_csrf');
+          setTimeout(function () { location.reload(); }, 900);
+        } else {
+          showMsg($('links-msg'), (res.d && res.d.error) || 'تعذّر حفظ الروابط.', 'err');
+        }
+      })
+      .catch(function () { showMsg($('links-msg'), 'تعذّر الاتصال بالخادم. الروابط ما اتحفظتش.', 'err'); })
+      .finally(function () {
+        btn.disabled = false;
+        btn.innerHTML = 'حفظ الروابط 💾';
+      });
+  });
 
   // ---- تشغيل ----
   checkSession();
