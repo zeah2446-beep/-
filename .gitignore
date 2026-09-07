@@ -19,5 +19,8 @@ uploads/*
 .DS_Store
 npm-debug.log*
 
+# مخرج بناء Vercel (بيتولد من public/ وقت البناء)
+output/
+
 # لا نرفع أبدًا بيانات العملاء أو النسخ الاحتياطية
 backups/

@@ -70,7 +70,10 @@ npm start          # أو: node server.js
 
 ### النشر على Vercel
 
-الملف `vercel.json` يوجّه كل الطلبات إلى خادم Express حتى تعمل `/api/posts` والطلبات والإدارة على الرابط العام (مثل `https://prrjffh.vercel.app`). بعد دفع الفرع إلى `main` يعيد Vercel النشر تلقائيًا.
+بعد دفع الفرع إلى `main` يعيد Vercel النشر تلقائيًا. طريقة العمل:
+
+- وقت البناء، `npm run build` ينسخ `public/` إلى `output/`، و**CDN بتاع Vercel يقدّم الملفات الثابتة (صفحات/صور/CSS/JS) مباشرة** — ده عدّل مشكلة إن الصور كانت ترجع 500 لما كانت بتعدّي من الـ function.
+- الـ Serverless Function (`api/index.js`) بتستقبل `/api/*` و`/media/*` (المرفوعات) بس.
 
 يمكن ضبط كلمة الإدارة على Vercel بمتغير البيئة `ADMIN_PASSWORD` (الافتراضي: `زياد زياد`).
 

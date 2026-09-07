@@ -1,10 +1,11 @@
 {
+  "buildCommand": "node scripts/build-vercel.js",
+  "outputDirectory": "output",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/api" }
+    { "source": "/media/(.*)", "destination": "/api" }
   ],
   "functions": {
     "api/index.js": {
-      "includeFiles": "public/**",
       "maxDuration": 30
     }
   }
